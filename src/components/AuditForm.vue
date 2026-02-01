@@ -1,96 +1,137 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from "vue";
+import { sendAuditRequest, type AuditEmailParams } from "../lib/email";
 
 interface FormData {
-  name: string
-  businessName: string
-  contact: string
-  website: string
+  name: string;
+  businessName: string;
+  contact: string;
+  website: string;
+  message: string;
+  honeypot: string; // Anti-spam honeypot
 }
 
 const formData = ref<FormData>({
-  name: '',
-  businessName: '',
-  contact: '',
-  website: ''
-})
+  name: "",
+  businessName: "",
+  contact: "",
+  website: "",
+  message: "",
+  honeypot: "",
+});
 
-const submitted = ref(false)
-const showConfirmation = ref(false)
+// États de l'UI
+const isSending = ref(false);
+const isSuccess = ref(false);
+const errorMessage = ref("");
 
-const whatsappMessage = computed(() => {
-  const msg = `Bonjour Gaspar,
+const handleSubmit = async () => {
+  // Reset des messages
+  errorMessage.value = "";
 
-Je demande un audit gratuit de mon site web :
-
-👤 Nom : ${formData.value.name}
-🏪 Commerce : ${formData.value.businessName}
-📞 Contact : ${formData.value.contact}
-${formData.value.website ? `🌐 Site actuel : ${formData.value.website}` : ''}
-
-Je souhaite discuter des opportunités d'amélioration.`
-  
-  return encodeURIComponent(msg)
-})
-
-const whatsappLink = computed(() => {
-  return `https://wa.me/33787483835?text=${whatsappMessage.value}`
-})
-
-const handleSubmit = () => {
-  if (!formData.value.name || !formData.value.businessName || !formData.value.contact) {
-    alert('Veuillez remplir tous les champs obligatoires')
-    return
+  // Validation basique
+  if (
+    !formData.value.name ||
+    !formData.value.businessName ||
+    !formData.value.contact
+  ) {
+    errorMessage.value = "Veuillez remplir tous les champs obligatoires";
+    return;
   }
-  
-  submitted.value = true
-  showConfirmation.value = true
-}
 
-const copyMessage = async () => {
-  const decodedMessage = decodeURIComponent(whatsappMessage.value)
-  
+  // Anti-spam : si le honeypot est rempli, c'est un bot
+  if (formData.value.honeypot) {
+    // Fausse réussite pour ne pas alerter le bot
+    isSuccess.value = true;
+    resetForm();
+    return;
+  }
+
+  // Préparation des paramètres pour EmailJS
+  const params: AuditEmailParams = {
+    name: formData.value.name,
+    business: formData.value.businessName,
+    contact: formData.value.contact,
+    website: formData.value.website || undefined,
+    message: formData.value.message || undefined,
+    pageUrl: window.location.href,
+    timestamp: new Date().toLocaleString("fr-FR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }),
+  };
+
+  // Envoi de l'email
+  isSending.value = true;
+
   try {
-    await navigator.clipboard.writeText(decodedMessage)
-    alert('Message copié dans le presse-papier !')
-  } catch (err) {
-    console.error('Erreur lors de la copie:', err)
-    // Fallback pour les navigateurs plus anciens
-    const textArea = document.createElement('textarea')
-    textArea.value = decodedMessage
-    textArea.style.position = 'fixed'
-    textArea.style.left = '-999999px'
-    document.body.appendChild(textArea)
-    textArea.select()
-    try {
-      document.execCommand('copy')
-      alert('Message copié dans le presse-papier !')
-    } catch (err2) {
-      alert('Impossible de copier le message')
-    }
-    document.body.removeChild(textArea)
+    await sendAuditRequest(params);
+    isSuccess.value = true;
+    resetForm();
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Une erreur est survenue. Veuillez réessayer.";
+  } finally {
+    isSending.value = false;
   }
-}
-
-const openWhatsApp = () => {
-  window.open(whatsappLink.value, '_blank')
-}
+};
 
 const resetForm = () => {
   formData.value = {
-    name: '',
-    businessName: '',
-    contact: '',
-    website: ''
-  }
-  submitted.value = false
-  showConfirmation.value = false
-}
+    name: "",
+    businessName: "",
+    contact: "",
+    website: "",
+    message: "",
+    honeypot: "",
+  };
+};
+
+const closeSuccess = () => {
+  isSuccess.value = false;
+};
 </script>
 
 <template>
   <div class="card max-w-2xl mx-auto">
-    <form v-if="!showConfirmation" @submit.prevent="handleSubmit" class="space-y-6">
+    <!-- Message de succès -->
+    <div v-if="isSuccess" class="text-center space-y-6">
+      <div class="text-6xl mb-4">
+        <svg
+          class="w-24 h-24 text-primary-400 mx-auto"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+        </svg>
+      </div>
+
+      <h3 class="text-2xl font-bold text-primary-400 mb-2">
+        Demande envoyée avec succès !
+      </h3>
+
+      <p class="text-secondary mb-6">
+        Merci pour votre demande d'audit. Je vous recontacterai très
+        prochainement pour discuter de votre projet.
+      </p>
+
+      <button @click="closeSuccess" class="btn-primary" type="button">
+        Nouvelle demande
+      </button>
+    </div>
+
+    <!-- Formulaire -->
+    <form v-else @submit.prevent="handleSubmit" class="space-y-6">
+      <!-- Message d'erreur -->
+      <div
+        v-if="errorMessage"
+        class="bg-red-500/10 border border-red-500/50 rounded-lg p-4 text-red-400 text-sm"
+      >
+        {{ errorMessage }}
+      </div>
+
       <div>
         <label for="name" class="block text-sm font-medium text-gray-300 mb-2">
           Nom <span class="text-red-400">*</span>
@@ -103,11 +144,15 @@ const resetForm = () => {
           placeholder="Jean Dupont"
           class="input-field"
           aria-required="true"
+          :disabled="isSending"
         />
       </div>
 
       <div>
-        <label for="businessName" class="block text-sm font-medium text-gray-300 mb-2">
+        <label
+          for="businessName"
+          class="block text-sm font-medium text-gray-300 mb-2"
+        >
           Nom du commerce <span class="text-red-400">*</span>
         </label>
         <input
@@ -118,11 +163,15 @@ const resetForm = () => {
           placeholder="Restaurant Le Lyonnais"
           class="input-field"
           aria-required="true"
+          :disabled="isSending"
         />
       </div>
 
       <div>
-        <label for="contact" class="block text-sm font-medium text-gray-300 mb-2">
+        <label
+          for="contact"
+          class="block text-sm font-medium text-gray-300 mb-2"
+        >
           Téléphone ou Email <span class="text-red-400">*</span>
         </label>
         <input
@@ -133,11 +182,15 @@ const resetForm = () => {
           placeholder="06 12 34 56 78 ou email@exemple.fr"
           class="input-field"
           aria-required="true"
+          :disabled="isSending"
         />
       </div>
 
       <div>
-        <label for="website" class="block text-sm font-medium text-gray-300 mb-2">
+        <label
+          for="website"
+          class="block text-sm font-medium text-gray-300 mb-2"
+        >
           Site actuel (optionnel)
         </label>
         <input
@@ -146,60 +199,72 @@ const resetForm = () => {
           type="url"
           placeholder="https://mon-site.fr"
           class="input-field"
+          :disabled="isSending"
+        />
+      </div>
+
+      <div>
+        <label
+          for="message"
+          class="block text-sm font-medium text-gray-300 mb-2"
+        >
+          Votre message (optionnel)
+        </label>
+        <textarea
+          id="message"
+          v-model="formData.message"
+          rows="4"
+          placeholder="Décrivez votre projet, vos objectifs ou vos questions..."
+          class="input-field resize-none"
+          :disabled="isSending"
+        />
+      </div>
+
+      <!-- Honeypot anti-spam (caché) -->
+      <div class="hidden" aria-hidden="true">
+        <label for="company">Company (do not fill)</label>
+        <input
+          id="company"
+          v-model="formData.honeypot"
+          type="text"
+          name="company"
+          tabindex="-1"
+          autocomplete="off"
         />
       </div>
 
       <button
         type="submit"
-        class="btn-primary w-full text-lg"
+        class="btn-primary w-full text-lg flex items-center justify-center gap-2"
+        :disabled="isSending"
       >
-        Demander l'audit
+        <svg
+          v-if="isSending"
+          class="animate-spin h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+        <span>{{ isSending ? "Envoi en cours..." : "Demander l'audit" }}</span>
       </button>
 
       <p class="text-xs text-gray-500 text-center">
-        Vos informations ne seront pas stockées. Elles servent uniquement à préparer le message.
+        Vos informations sont envoyées directement et ne sont pas stockées sur
+        le site.
       </p>
     </form>
-
-    <!-- Confirmation Message -->
-    <div v-else class="text-center space-y-6">
-      <div class="text-6xl mb-4">✅</div>
-      
-      <h3 class="text-2xl font-bold text-primary-400 mb-2">
-        Demande enregistrée !
-      </h3>
-      
-      <p class="text-gray-300 mb-6">
-        Votre message est prêt. Choisissez comment me l'envoyer :
-      </p>
-
-      <div class="bg-dark-900 p-6 rounded-lg mb-6 text-left">
-        <p class="text-sm text-gray-400 mb-2 font-semibold">Aperçu du message :</p>
-        <pre class="text-sm text-gray-300 whitespace-pre-wrap font-mono">{{ decodeURIComponent(whatsappMessage) }}</pre>
-      </div>
-
-      <div class="flex flex-col sm:flex-row gap-4">
-        <button
-          @click="copyMessage"
-          class="btn-secondary flex-1"
-        >
-          📋 Copier le message
-        </button>
-        
-        <button
-          @click="openWhatsApp"
-          class="btn-primary flex-1"
-        >
-          💬 Ouvrir WhatsApp
-        </button>
-      </div>
-
-      <button
-        @click="resetForm"
-        class="text-gray-500 hover:text-gray-300 text-sm transition-colors mt-4"
-      >
-        ← Nouvelle demande
-      </button>
-    </div>
   </div>
 </template>
