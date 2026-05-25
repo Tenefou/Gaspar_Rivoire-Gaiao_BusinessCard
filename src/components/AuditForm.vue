@@ -132,39 +132,41 @@ const closeSuccess = () => {
         {{ errorMessage }}
       </div>
 
-      <div>
-        <label for="name" class="block text-sm font-medium text-gray-300 mb-2">
-          Nom <span class="text-red-400">*</span>
-        </label>
-        <input
-          id="name"
-          v-model="formData.name"
-          type="text"
-          required
-          placeholder="Jean Dupont"
-          class="input-field"
-          aria-required="true"
-          :disabled="isSending"
-        />
-      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-300 mb-2">
+            Nom <span class="text-red-400">*</span>
+          </label>
+          <input
+            id="name"
+            v-model="formData.name"
+            type="text"
+            required
+            placeholder="Jean Dupont"
+            class="input-field"
+            aria-required="true"
+            :disabled="isSending"
+          />
+        </div>
 
-      <div>
-        <label
-          for="businessName"
-          class="block text-sm font-medium text-gray-300 mb-2"
-        >
-          Nom du commerce <span class="text-red-400">*</span>
-        </label>
-        <input
-          id="businessName"
-          v-model="formData.businessName"
-          type="text"
-          required
-          placeholder="Restaurant Le Lyonnais"
-          class="input-field"
-          aria-required="true"
-          :disabled="isSending"
-        />
+        <div>
+          <label
+            for="businessName"
+            class="block text-sm font-medium text-gray-300 mb-2"
+          >
+            Nom du commerce <span class="text-red-400">*</span>
+          </label>
+          <input
+            id="businessName"
+            v-model="formData.businessName"
+            type="text"
+            required
+            placeholder="Restaurant Le Lyonnais"
+            class="input-field"
+            aria-required="true"
+            :disabled="isSending"
+          />
+        </div>
       </div>
 
       <div>
